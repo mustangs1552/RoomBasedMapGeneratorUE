@@ -24,12 +24,14 @@ then
     gitDescMinorVer="0"
     gitDescPatchVer="0"
     git tag "v$gitDescMajorVer.$gitDescMinorVer"
+    git push origin "v$gitDescMajorVer.$gitDescMinorVer"
 elif [ $defGameIniFileMinorVer -gt $gitDescMinorVer ]
 then
     echo "Minor version larger in 'defaultGame.ini' file. Incrementing version to that and creating new tag..."
     gitDescMinorVer=$defGameIniFileMinorVer
     gitDescPatchVer="0"
     git tag "v$gitDescMajorVer.$gitDescMinorVer"
+    git push origin "v$gitDescMajorVer.$gitDescMinorVer"
 else
     gitDescPatchVer=$(($gitDescPatchVer + 1))
 fi
