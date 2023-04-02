@@ -71,7 +71,7 @@ void Versioning::RemoveIncrements()
 
 FString Versioning::GetProjectSettingsVersion()
 {
-	FString defaultGameIniPath = FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir());
+	FString defaultGameIniPath = FConfigCacheIni::NormalizeConfigIniPath(FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir()));
 	if (FPlatformFileManager::Get().GetPlatformFile().IsReadOnly(*defaultGameIniPath)) FPlatformFileManager::Get().GetPlatformFile().SetReadOnly(*defaultGameIniPath, false);
 	FString ver;
 	GConfig->GetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), ver, defaultGameIniPath);
@@ -81,7 +81,7 @@ void Versioning::SetProjectSettingsVersion(string newVersion)
 {
 	if (!newVersion.empty())
 	{
-		FString defaultGameIniPath = FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir());
+		FString defaultGameIniPath = FConfigCacheIni::NormalizeConfigIniPath(FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir()));
 		if (FPlatformFileManager::Get().GetPlatformFile().IsReadOnly(*defaultGameIniPath)) FPlatformFileManager::Get().GetPlatformFile().SetReadOnly(*defaultGameIniPath, false);
 		GConfig->SetString(TEXT("/Script/EngineSettings.GeneralProjectSettings"), TEXT("ProjectVersion"), UTF8_TO_TCHAR(newVersion.c_str()), defaultGameIniPath);
 		GConfig->Flush(false, defaultGameIniPath);
