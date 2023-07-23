@@ -6,6 +6,7 @@
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 #include "ToolMenus.h"
+#include "VersioningTool.h"
 
 static const FName AutoVersioningTabName("Auto Versioning");
 
@@ -32,6 +33,8 @@ void FAutoVersioningModule::StartupModule()
 	FGlobalTabmanager::Get()->RegisterNomadTabSpawner(AutoVersioningTabName, FOnSpawnTab::CreateRaw(this, &FAutoVersioningModule::OnSpawnPluginTab))
 		.SetDisplayName(LOCTEXT("FAutoVersioningTabTitle", "Auto Versioning"))
 		.SetMenuType(ETabSpawnerMenuType::Hidden);
+
+	gitUtility = new GitUtility();
 }
 
 void FAutoVersioningModule::ShutdownModule()
@@ -52,8 +55,8 @@ void FAutoVersioningModule::ShutdownModule()
 
 TSharedRef<SDockTab> FAutoVersioningModule::OnSpawnPluginTab(const FSpawnTabArgs& SpawnTabArgs)
 {
-	string gitPath = versioning->GetGitPath();
-	string repoPath = versioning->GetRepoPath();
+	string gitPath = gitUtility->repoLoc;
+	string repoPath = gitUtility->gitLoc;
 
 	return SNew(SDockTab).TabRole(ETabRole::NomadTab).ShouldAutosize(true)
 	[
@@ -178,6 +181,18 @@ TSharedRef<SDockTab> FAutoVersioningModule::OnSpawnPluginTab(const FSpawnTabArgs
 				SNew(SButton).Text(FText::FromString("Update")).OnClicked_Raw(this, &FAutoVersioningModule::OnUpdateButtonClicked)
 			]
 		]
+		+SVerticalBox::Slot().HAlign(HAlign_Center).VAlign(VAlign_Center).AutoHeight().Padding(5)
+		[
+			SNew(SHorizontalBox)
+			+SHorizontalBox::Slot().VAlign(VAlign_Center).AutoWidth().Padding(5, 0)
+			[
+				SNew(SButton).Text(FText::FromString("Save Generated Version")).OnClicked_Raw(this, &FAutoVersioningModule::OnApplyVersionButtonClicked)
+			]
+			+SHorizontalBox::Slot().AutoWidth()
+			[
+				SNew(SButton).Text(FText::FromString("Reset Saved Version")).OnClicked_Raw(this, &FAutoVersioningModule::OnResetVersionButtonClicked)
+			]
+		]
 	];
 }
 
@@ -189,7 +204,7 @@ void FAutoVersioningModule::PluginButtonClicked()
 
 void FAutoVersioningModule::SaveSettings() const
 {
-	FString defaultGameIniPath = FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir());
+	FString defaultGameIniPath = FConfigCacheIni::NormalizeConfigIniPath(FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir()));
 	if (FPlatformFileManager::Get().GetPlatformFile().IsReadOnly(*defaultGameIniPath)) FPlatformFileManager::Get().GetPlatformFile().SetReadOnly(*defaultGameIniPath, false);
 
 	GConfig->SetString(TEXT("/Script/AutoVersioningSettings"), TEXT("UsePreReleaseText"), UTF8_TO_TCHAR(((usePreReleaseText) ? "true" : "false")), defaultGameIniPath);
@@ -201,7 +216,7 @@ void FAutoVersioningModule::SaveSettings() const
 }
 void FAutoVersioningModule::LoadSettings()
 {
-	FString defaultGameIniPath = FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir());
+	FString defaultGameIniPath = FConfigCacheIni::NormalizeConfigIniPath(FString::Printf(TEXT("%sDefaultGame.ini"), *FPaths::SourceConfigDir()));
 	if (FPlatformFileManager::Get().GetPlatformFile().IsReadOnly(*defaultGameIniPath)) FPlatformFileManager::Get().GetPlatformFile().SetReadOnly(*defaultGameIniPath, false);
 
 	FString loadedUsePreReleaseText;
@@ -213,17 +228,15 @@ void FAutoVersioningModule::LoadSettings()
 	FString loadedBuildText;
 	GConfig->GetString(TEXT("/Script/AutoVersioningSettings"), TEXT("BuildText"), loadedBuildText, defaultGameIniPath);
 
-	if (loadedUsePreReleaseText.ToLower() == "true") usePreReleaseText = true;
-	else usePreReleaseText = false;
+	usePreReleaseText = loadedUsePreReleaseText.ToLower() == "true";
 	preReleaseText = TCHAR_TO_UTF8(*loadedPreReleaseText);
-	if (loadedUseBuildText.ToLower() == "true") useBuildText = true;
-	else useBuildText = false;
+	useBuildText = loadedUseBuildText.ToLower() == "true";
 	buildText = TCHAR_TO_UTF8(*loadedBuildText);
 }
 
 void FAutoVersioningModule::SetupVersioning()
 {
-	versioning = new Versioning();
+	versioning = new VersioningTool(gitUtility);
 	LoadSettings();
 	UpdateVersion();
 	gitVersion = versioning->GitVersion();
@@ -238,7 +251,6 @@ string FAutoVersioningModule::UpdateVersion() const
 {
 	UpdateVersioning();
 	version = versioning->VersionPreReleaseBuild();
-	versioning->SetProjectSettingsVersion(version);
 	return version;
 }
 string FAutoVersioningModule::UpdateAndApplyVersion()
@@ -283,6 +295,11 @@ FReply FAutoVersioningModule::OnRemoveIncrementsButtonClicked() const
 FReply FAutoVersioningModule::OnApplyVersionButtonClicked() const
 {
 	versioning->SetProjectSettingsVersion(version);
+	return FReply::Handled();
+}
+FReply FAutoVersioningModule::OnResetVersionButtonClicked() const
+{
+	versioning->ResetProjectSettingsVersion();
 	return FReply::Handled();
 }
 

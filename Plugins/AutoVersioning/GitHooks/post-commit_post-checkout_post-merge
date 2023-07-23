@@ -9,7 +9,7 @@ gitDescMajorVer=$(cut -d . -f 1 <<< $gitDescVer)
 gitDescMinorVer=$(cut -d . -f 2 <<< $gitDescVer)
 gitDescPatchVer=$(cut -d . -f 3 <<< $gitDescVer)
 
-echo "New project version from git: $gitDescVer"
+echo "Version from Git: $gitDescVer"
 
 defGameIniFile=$(git rev-parse --show-toplevel)/Config/DefaultGame.ini
 defGameIniFileVer=$(awk "/ProjectVersion=.*/{print $2}" $defGameIniFile)
@@ -17,7 +17,9 @@ defGameIniFileVer=${defGameIniFileVer:15}
 defGameIniFileMajorVer=$(cut -d . -f 1 <<< $defGameIniFileVer)
 defGameIniFileMinorVer=$(cut -d . -f 2 <<< $defGameIniFileVer)
 
-if [ $defGameIniFileMajorVer -gt $gitDescMajorVer ]
+echo "UE Version: $defGameIniFileVer"
+
+if [[ $defGameIniFileMajorVer -gt $gitDescMajorVer ]]
 then
     echo "Major version larger in 'defaultGame.ini' file. Incrementing version to that and creating new tag..."
     gitDescMajorVer=$defGameIniFileMajorVer
@@ -25,7 +27,7 @@ then
     gitDescPatchVer="0"
     git tag "v$gitDescMajorVer.$gitDescMinorVer"
     git push origin "v$gitDescMajorVer.$gitDescMinorVer"
-elif [ $defGameIniFileMinorVer -gt $gitDescMinorVer ]
+elif [[ $defGameIniFileMinorVer -gt $gitDescMinorVer ]]
 then
     echo "Minor version larger in 'defaultGame.ini' file. Incrementing version to that and creating new tag..."
     gitDescMinorVer=$defGameIniFileMinorVer
@@ -36,5 +38,5 @@ else
     gitDescPatchVer=$(($gitDescPatchVer + 1))
 fi
 
-echo "New project version final: $gitDescMajorVer.$gitDescMinorVer.$gitDescPatchVer"
+echo "New Project Version: $gitDescMajorVer.$gitDescMinorVer.$gitDescPatchVer"
 sed -i "s/ProjectVersion=[0-9]*.[0-9]*.[0-9]*/ProjectVersion=$gitDescMajorVer.$gitDescMinorVer.$gitDescPatchVer/" $defGameIniFile

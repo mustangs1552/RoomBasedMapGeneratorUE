@@ -2,7 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
-#include "Versioning.h"
+#include "GitUtility.h"	
+#include "IVersioning.h"
 
 class FToolBarBuilder;
 class FMenuBuilder;
@@ -10,7 +11,8 @@ class FMenuBuilder;
 class FAutoVersioningModule : public IModuleInterface
 {
 public:
-	Versioning* versioning;
+	GitUtility* gitUtility;
+	IVersioning* versioning;
 	mutable string gitVersion;
 	mutable string version;
 	mutable bool usePreReleaseText;
@@ -38,6 +40,7 @@ public:
 	FReply OnIncrementMinorVersionButtonClicked() const;
 	FReply OnRemoveIncrementsButtonClicked() const;
 	FReply OnApplyVersionButtonClicked() const;
+	FReply OnResetVersionButtonClicked() const;
 	ECheckBoxState GetUsePreReleaseText() const;
 	void OnUsePreReleaseTextCBStateChanged(ECheckBoxState inState) const;
 	FText GetPreReleaseText() const;
