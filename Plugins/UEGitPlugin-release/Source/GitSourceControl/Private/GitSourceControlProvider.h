@@ -5,14 +5,12 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "ISourceControlOperation.h"
-#include "ISourceControlState.h"
 #include "ISourceControlProvider.h"
 #include "IGitSourceControlWorker.h"
-#include "GitSourceControlState.h"
 #include "GitSourceControlMenu.h"
 #include "Runtime/Launch/Resources/Version.h"
+
+class FGitSourceControlState;
 
 class FGitSourceControlCommand;
 
@@ -107,7 +105,7 @@ public:
 	 */
 	void CheckGitAvailability();
 
-	/** Refresh Git settings from source control settings */
+	/** Refresh Git settings from revision control settings */
 	void UpdateSettings();
 
 	/**
@@ -127,7 +125,7 @@ public:
 		return GitVersion;
 	}
 
-	/** Path to the root of the Unreal source control repository: usually the ProjectDir */
+	/** Path to the root of the Unreal revision control repository: usually the ProjectDir */
 	inline const FString& GetPathToRepositoryRoot() const
 	{
 		return PathToRepositoryRoot;
@@ -203,11 +201,8 @@ public:
 
 	const FString& GetRemoteBranchName() const { return RemoteBranchName; }
 
-	const TArray<FString>& GetStatusBranchNames() const
-	{
-		return StatusBranchNames;
-	}
-
+	TArray<FString> GetStatusBranchNames() const;
+	
 	/** Indicates editor binaries are to be updated upon next sync */
 	bool bPendingRestart;
 
@@ -249,7 +244,7 @@ private:
 	/** Update repository status on Connect and UpdateStatus operations */
 	void UpdateRepositoryStatus(const class FGitSourceControlCommand& InCommand);
 
-	/** Path to the root of the Unreal source control repository: usually the ProjectDir */
+	/** Path to the root of the Unreal revision control repository: usually the ProjectDir */
 	FString PathToRepositoryRoot;
 
 	/** Path to the root of the Git repository: can be the ProjectDir itself, or any parent directory (found by the "Connect" operation) */
@@ -279,19 +274,19 @@ private:
 	/** State cache */
 	TMap<FString, TSharedRef<class FGitSourceControlState, ESPMode::ThreadSafe> > StateCache;
 
-	/** The currently registered source control operations */
+	/** The currently registered revision control operations */
 	TMap<FName, FGetGitSourceControlWorker> WorkersMap;
 
 	/** Queue for commands given by the main thread */
 	TArray < FGitSourceControlCommand* > CommandQueue;
 
-	/** For notifying when the source control states in the cache have changed */
+	/** For notifying when the revision control states in the cache have changed */
 	FSourceControlStateChanged OnSourceControlStateChanged;
 
 	/** Git version for feature checking */
 	FGitVersion GitVersion;
 
-	/** Source Control Menu Extension */
+	/** Revision Control Menu Extension */
 	FGitSourceControlMenu GitSourceControlMenu;
 
 	/**
@@ -300,8 +295,8 @@ private:
 	*/
 	TArray<FString> IgnoreForceCache;
 
-	/** Array of branch names for status queries */
-	TArray<FString> StatusBranchNames;
-
+	/** Array of branch name patterns for status queries */
+	TArray<FString> StatusBranchNamePatternsInternal;
+		
 	class FGitSourceControlRunner* Runner = nullptr;
 };

@@ -5,14 +5,16 @@
 
 #pragma once
 
-#include "CoreMinimal.h"
-#include "Layout/Visibility.h"
-#include "Input/Reply.h"
-#include "Widgets/DeclarativeSyntaxSupport.h"
 #include "Widgets/SCompoundWidget.h"
-#include "SlateFwd.h"
-#include "ISourceControlOperation.h"
 #include "ISourceControlProvider.h"
+#include "Runtime/Launch/Resources/Version.h"
+
+class SNotificationItem;
+#if ENGINE_MAJOR_VERSION >= 5 && ENGINE_MINOR_VERSION >= 2
+namespace ETextCommit { enum Type : int; }
+#else
+namespace ETextCommit { enum Type; }
+#endif
 
 enum class ECheckBoxState : uint8;
 
@@ -85,7 +87,7 @@ private:
 	void LaunchMarkForAddOperation(const TArray<FString>& InFiles);
 	void LaunchCheckInOperation();
 
-	/** Delegate called when a source control operation has completed */
+	/** Delegate called when a revision control operation has completed */
 	void OnSourceControlOperationComplete(const FSourceControlOperationRef& InOperation, ECommandResult::Type InResult);
 
 	/** Asynchronous operation progress notifications */

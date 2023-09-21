@@ -6,7 +6,10 @@
 #include "GitSourceControlState.h"
 
 #if ENGINE_MAJOR_VERSION >= 5
-#include "Styling/AppStyle.h"
+#include "Textures/SlateIcon.h"
+#if ENGINE_MINOR_VERSION >= 2
+#include "RevisionControlStyle/RevisionControlStyle.h"
+#endif
 #endif
 
 #define LOCTEXT_NAMESPACE "GitSourceControl.State"
@@ -37,9 +40,18 @@ TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlS
 
 TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlState::FindHistoryRevision(const FString& InRevision) const
 {
+	// short hash must be >= 7 characters to have a reasonable probability of finding the correct revision
+	if (!ensure(InRevision.Len() < 7))
+	{
+		return nullptr;
+	}
+
 	for (const auto& Revision : History)
 	{
-		if (Revision->GetRevision() == InRevision)
+		// support for short hashes
+		const int32 Len = FMath::Min(Revision->FileHash.Len(), InRevision.Len());
+
+		if (Revision->FileHash.Left(Len) == InRevision.Left(Len))
 		{
 			return Revision;
 		}
@@ -48,12 +60,13 @@ TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlS
 	return nullptr;
 }
 
+#if ENGINE_MAJOR_VERSION < 5 || ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION < 3
 TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlState::GetBaseRevForMerge() const
 {
 	for(const auto& Revision : History)
 	{
 		// look for the the SHA1 id of the file, not the commit id (revision)
-		if(Revision->FileHash == PendingMergeBaseFileHash)
+		if (Revision->FileHash == PendingMergeBaseFileHash)
 		{
 			return Revision;
 		}
@@ -61,6 +74,7 @@ TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlS
 
 	return nullptr;
 }
+#endif
 
 #if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 2
 TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlState::GetCurrentRevision() const
@@ -69,43 +83,54 @@ TSharedPtr<class ISourceControlRevision, ESPMode::ThreadSafe> FGitSourceControlS
 }
 #endif
 
+#if ENGINE_MAJOR_VERSION == 5 && ENGINE_MINOR_VERSION >= 3
+ISourceControlState::FResolveInfo FGitSourceControlState::GetResolveInfo() const
+{
+	return PendingResolveInfo;
+}
+#endif
+
 // @todo add Slate icons for git specific states (NotAtHead vs Conflicted...)
 
 #if ENGINE_MAJOR_VERSION < 5
-#define GET_ICON_RETURN( NAME ) FName( NAME )
+#define GET_ICON_RETURN( NAME ) FName( "ContentBrowser.SCC_" #NAME )
 FName FGitSourceControlState::GetIconName() const
 {
 #else
-#define GET_ICON_RETURN( NAME ) FSlateIcon(FAppStyle::GetAppStyleSetName(), NAME )
+#if ENGINE_MINOR_VERSION >= 2
+#define GET_ICON_RETURN( NAME ) FSlateIcon(FRevisionControlStyleManager::GetStyleSetName(), "RevisionControl." #NAME )
+#else
+#define GET_ICON_RETURN( NAME ) FSlateIcon(FAppStyle::GetAppStyleSetName(), "Perforce." #NAME )
+#endif
 FSlateIcon FGitSourceControlState::GetIcon() const
 {
 #endif
 	switch (GetGitState())
 	{
 	case EGitState::NotAtHead:
-		return GET_ICON_RETURN("Perforce.NotAtHeadRevision");
+		return GET_ICON_RETURN(NotAtHeadRevision);
 	case EGitState::LockedOther:
-		return GET_ICON_RETURN("Perforce.CheckedOutByOtherUser");
+		return GET_ICON_RETURN(CheckedOutByOtherUser);
 	case EGitState::NotLatest:
-		return GET_ICON_RETURN("Perforce.ModifiedOtherBranch");
+		return GET_ICON_RETURN(ModifiedOtherBranch);
 	case EGitState::Unmerged:
-		return GET_ICON_RETURN("Perforce.Branched");
+		return GET_ICON_RETURN(Branched);
 	case EGitState::Added:
-		return GET_ICON_RETURN("Perforce.OpenForAdd");
+		return GET_ICON_RETURN(OpenForAdd);
 	case EGitState::Untracked:
-		return GET_ICON_RETURN("Perforce.NotInDepot");
+		return GET_ICON_RETURN(NotInDepot);
 	case EGitState::Deleted:
-		return GET_ICON_RETURN("Perforce.MarkedForDelete");
+		return GET_ICON_RETURN(MarkedForDelete);
 	case EGitState::Modified:
 	case EGitState::CheckedOut:
-		return GET_ICON_RETURN("Perforce.CheckedOut");
+		return GET_ICON_RETURN(CheckedOut);
 	case EGitState::Ignored:
-		return GET_ICON_RETURN("Perforce.NotInDepot");
+		return GET_ICON_RETURN(NotInDepot);
 	default:
 #if ENGINE_MAJOR_VERSION < 5
 	  return NAME_None;
 #else
-	  return {};
+	  return FSlateIcon();
 #endif
 	}
 }
@@ -115,24 +140,24 @@ FName FGitSourceControlState::GetSmallIconName() const
 {
 	switch (GetGitState()) {
 	case EGitState::NotAtHead:
-	  return FName("Perforce.NotAtHeadRevision_Small");
+	  return FName("ContentBrowser.SCC_NotAtHeadRevision_Small");
 	case EGitState::LockedOther:
-	  return FName("Perforce.CheckedOutByOtherUser_Small");
+	  return FName("ContentBrowser.SCC_CheckedOutByOtherUser_Small");
 	case EGitState::NotLatest:
-	  return FName("Perforce.ModifiedOtherBranch_Small");
+	  return FName("ContentBrowser.SCC_ModifiedOtherBranch_Small");
 	case EGitState::Unmerged:
-	  return FName("Perforce.Branched_Small");
+	  return FName("ContentBrowser.SCC_Branched_Small");
 	case EGitState::Added:
-	  return FName("Perforce.OpenForAdd_Small");
+	  return FName("ContentBrowser.SCC_OpenForAdd_Small");
 	case EGitState::Untracked:
-	  return FName("Perforce.NotInDepot_Small");
+	  return FName("ContentBrowser.SCC_NotInDepot_Small");
 	case EGitState::Deleted:
-	  return FName("Perforce.MarkedForDelete_Small");
+	  return FName("ContentBrowser.SCC_MarkedForDelete_Small");
 	case EGitState::Modified:
         case EGitState::CheckedOut:
-                return FName("Perforce.CheckedOut_Small");
+                return FName("ContentBrowser.SCC_CheckedOut_Small");
 	case EGitState::Ignored:
-	  return FName("Perforce.NotInDepot_Small");
+	  return FName("ContentBrowser.SCC_NotInDepot_Small");
 	default:
 	  return NAME_None;
 	}
@@ -154,7 +179,7 @@ FText FGitSourceControlState::GetDisplayName() const
 	case EGitState::Added:
 		return LOCTEXT("OpenedForAdd", "Opened for add");
 	case EGitState::Untracked:
-		return LOCTEXT("NotInDepot", "Not in depot");
+		return LOCTEXT("NotControlled", "Not Under Revision Control");
 	case EGitState::Deleted:
 		return LOCTEXT("MarkedForDelete", "Marked for delete");
 	case EGitState::Modified:
@@ -186,7 +211,7 @@ FText FGitSourceControlState::GetDisplayTooltip() const
 	case EGitState::Added:
 		return LOCTEXT("OpenedForAdd_Tooltip", "The file(s) are opened for add");
 	case EGitState::Untracked:
-		return LOCTEXT("NotControlled_Tooltip", "Item is not under version control.");
+		return LOCTEXT("NotControlled_Tooltip", "Item is not under revision control.");
 	case EGitState::Deleted:
 		return LOCTEXT("MarkedForDelete_Tooltip", "The file(s) are marked for delete");
 	case EGitState::Modified:
@@ -197,7 +222,7 @@ FText FGitSourceControlState::GetDisplayTooltip() const
 	case EGitState::Lockable:
 		return LOCTEXT("ReadOnly_Tooltip", "The file(s) are marked locally as read-only");
 	case EGitState::None:
-		return LOCTEXT("Unknown_Tooltip", "The file(s) status is unknown");
+		return LOCTEXT("Unknown_Tooltip", "Unknown revision control state");
 	default:
 		return FText();
 	}
@@ -213,7 +238,7 @@ const FDateTime& FGitSourceControlState::GetTimeStamp() const
 	return TimeStamp;
 }
 
-// Deleted and Missing assets cannot appear in the Content Browser, but they do in the Submit files to Source Control window!
+// Deleted and Missing assets cannot appear in the Content Browser, but they do in the Submit files to Revision Control window!
 bool FGitSourceControlState::CanCheckIn() const
 {
 	// We can check in if this is new content
@@ -349,7 +374,7 @@ bool FGitSourceControlState::CanDelete() const
 	{
 		return false;
 	}
-	// If someone else hasn't checked it out, we can delete source controlled files.
+	// If someone else hasn't checked it out, we can delete revision controlled files.
 	return !IsCheckedOutOther() && IsSourceControlled();
 }
 
