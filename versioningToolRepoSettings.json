@@ -1,1 +1,20 @@
-{"PreReleaseText":"beta","BuildText":"","CommitCountAsMode":1,"ExcludeCommitCountIfZero":true,"FlipPreReleaseCompare":false,"ExcludePreReleaseOnIncrement":false,"ExcludeBuildOnIncrement":false,"IsUEProject":true,"VSProjectPaths":"","PackageJSONPaths":"","ElectronManifestJSONPaths":"","MergeUEVersion":true,"MergeVSProjectsVersions":false,"MergePackageJSONVersions":false,"MergeElectronManifestJSONVersions":false,"UsePreCommitMode":true,"CreateNewVersionTag":false,"PushNewVersionTag":false}
+{
+  "PreReleaseText": "beta",
+  "BuildText": "",
+  "CommitCountAsMode": 1,
+  "ExcludeCommitCountIfZero": true,
+  "FlipPreReleaseCompare": false,
+  "ExcludePreReleaseOnIncrement": false,
+  "ExcludeBuildOnIncrement": false,
+  "IsUEProject": true,
+  "VSProjectPaths": "",
+  "PackageJSONPaths": "",
+  "ElectronManifestJSONPaths": "",
+  "MergeUEVersion": true,
+  "MergeVSProjectsVersions": false,
+  "MergePackageJSONVersions": false,
+  "MergeElectronManifestJSONVersions": false,
+  "UsePreCommitMode": true,
+  "CreateNewVersionTag": false,
+  "PushNewVersionTag": false
+}
