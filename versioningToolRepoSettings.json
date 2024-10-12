@@ -6,7 +6,7 @@
   "FlipPreReleaseCompare": false,
   "ExcludePreReleaseOnIncrement": false,
   "ExcludeBuildOnIncrement": false,
-  "IsUEProject": true,
+  "UEProjPaths": "RoomBasedMapGeneratorUE.uproject",
   "VSProjectPaths": "",
   "PackageJSONPaths": "",
   "ElectronManifestJSONPaths": "",
