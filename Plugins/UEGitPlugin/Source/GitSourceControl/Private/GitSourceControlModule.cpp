@@ -25,10 +25,17 @@
 #include "Framework/Commands/UIAction.h"
 #include "Framework/MultiBox/MultiBoxExtender.h"
 #include "Framework/MultiBox/MultiBoxBuilder.h"
+#include "Misc/ConfigCacheIni.h"
 
 #define LOCTEXT_NAMESPACE "GitSourceControl"
 
 TArray<FString> FGitSourceControlModule::EmptyStringArray;
+
+namespace
+{
+    static const FName NAME_SourceControl( TEXT( "SourceControl" ) );
+    static const FName NAME_ContentBrowser( TEXT( "ContentBrowser" ) );
+}
 
 template<typename Type>
 static TSharedRef<IGitSourceControlWorker, ESPMode::ThreadSafe> CreateWorker()
@@ -57,10 +64,43 @@ void FGitSourceControlModule::StartupModule()
 	// load our settings
 	GitSourceControlSettings.LoadSettings();
 
-	// Bind our revision control provider to the editor
-	IModularFeatures::Get().RegisterModularFeature( "SourceControl", &GitSourceControlProvider );
+	// If configured, do a check if the current user has permissions to access a specified repository. Exit with a fatal error if that is the case.
+	FString RequiredRepositoryAccessURL, RequiredRepositoryAccessBranchName;
+	GConfig->GetString(TEXT("GitSourceControl"), TEXT("RequiredAccessRepositoryURL"), RequiredRepositoryAccessURL, GEditorIni);
+	GConfig->GetString(TEXT("GitSourceControl"), TEXT("RequiredAccessRepositoryBranchName"), RequiredRepositoryAccessBranchName, GEditorIni);
+	if (!RequiredRepositoryAccessURL.IsEmpty())
+	{
+		if (RequiredRepositoryAccessBranchName.IsEmpty())
+		{
+			RequiredRepositoryAccessBranchName = "main";
+		}
+		int32 ReturnCode;
+		FString StdErr;
+		// Will fail (or block forever) over HTTPS if GCM is not set up
+		// If using SSH, will fail if user doesn't have SSH keys set up
+		const bool bLaunchedProcess = FPlatformProcess::ExecProcess(
+			TEXT("git"),
+			*FString::Format(TEXT("ls-remote --exit-code {0} {1}"), {RequiredRepositoryAccessURL, RequiredRepositoryAccessBranchName}),
+			&ReturnCode, nullptr, &StdErr);
+		if (!bLaunchedProcess)
+		{
+			UE_LOG(LogSourceControl, Fatal, TEXT("Could not launch git: %s"), *StdErr);
+		}
+		else if (ReturnCode != 0)
+		{
+			if (StdErr.IsEmpty())
+			{
+				StdErr = TEXT("Branch not found"); // if there is no output and there is a bad exit code, it's very likely the branch name was not found
+			}
+			UE_LOG(LogSourceControl, Fatal, TEXT("Could access branch %s on required repository %s(%d): %s"),
+				*RequiredRepositoryAccessBranchName, *RequiredRepositoryAccessURL, ReturnCode, *StdErr);
+		}
+	}
 
-	FContentBrowserModule& ContentBrowserModule = FModuleManager::Get().LoadModuleChecked<FContentBrowserModule>("ContentBrowser");
+	// Bind our revision control provider to the editor
+    IModularFeatures::Get().RegisterModularFeature( NAME_SourceControl, &GitSourceControlProvider );
+
+	FContentBrowserModule & ContentBrowserModule = FModuleManager::Get().LoadModuleChecked< FContentBrowserModule >( NAME_ContentBrowser );
 
 #if ENGINE_MAJOR_VERSION >= 5
 	// Register ContentBrowserDelegate Handles for UE5 EA
@@ -86,11 +126,11 @@ void FGitSourceControlModule::ShutdownModule()
 	GitSourceControlProvider.Close();
 
 	// unbind provider from editor
-	IModularFeatures::Get().UnregisterModularFeature("SourceControl", &GitSourceControlProvider);
+    IModularFeatures::Get().UnregisterModularFeature( NAME_SourceControl, &GitSourceControlProvider );
 
 
 	// Unregister ContentBrowserDelegate Handles
-    FContentBrowserModule & ContentBrowserModule = FModuleManager::Get().LoadModuleChecked< FContentBrowserModule >( "ContentBrowser" );
+    FContentBrowserModule & ContentBrowserModule = FModuleManager::Get().GetModuleChecked< FContentBrowserModule >( NAME_ContentBrowser );
 #if ENGINE_MAJOR_VERSION >= 5
 	ContentBrowserModule.GetOnFilterChanged().Remove( CbdHandle_OnFilterChanged );
 	ContentBrowserModule.GetOnSearchBoxChanged().Remove( CbdHandle_OnSearchBoxChanged );

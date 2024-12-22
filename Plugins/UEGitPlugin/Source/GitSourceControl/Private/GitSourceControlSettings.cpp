@@ -16,7 +16,7 @@ static const FString SettingsSection = TEXT("GitSourceControl.GitSourceControlSe
 
 }
 
-const FString FGitSourceControlSettings::GetBinaryPath() const
+const FString & FGitSourceControlSettings::GetBinaryPath() const
 {
 	FScopeLock ScopeLock(&CriticalSection);
 	return BinaryPath; // Return a copy to be thread-safe

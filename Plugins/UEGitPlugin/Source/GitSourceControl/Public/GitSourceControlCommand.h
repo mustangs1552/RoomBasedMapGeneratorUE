@@ -40,7 +40,7 @@ public:
 	 *  Modify the repo root if all selected files are in a plugin subfolder, and the plugin subfolder is a git repo
 	 *  This supports the case where each plugin is a sub module
 	 */
-	void UpdateRepositoryRootIfSubmodule(const TArray<FString>& AbsoluteFilePaths);
+	void UpdateRepositoryRootIfSubmodule(TArray<FString>& AbsoluteFilePaths);
 
 	/**
 	 * This is where the real thread work is done. All work that is done for

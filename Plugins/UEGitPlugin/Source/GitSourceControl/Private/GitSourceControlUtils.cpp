@@ -124,10 +124,13 @@ void FGitLockedFilesCache::OnFileLockChanged(const FString& filePath, const FStr
 
 namespace GitSourceControlUtils
 {
-	FString ChangeRepositoryRootIfSubmodule(const TArray<FString>& AbsoluteFilePaths, const FString& PathToRepositoryRoot)
+	FString ChangeRepositoryRootIfSubmodule(TArray<FString>& AbsoluteFilePaths, const FString& PathToRepositoryRoot)
 	{
 		FString Ret = PathToRepositoryRoot;
 		// note this is not going to support operations where selected files are in different repositories
+
+		TArray<FString> PackageNotIncludedInGit;
+		PackageNotIncludedInGit.Reserve(AbsoluteFilePaths.Num());
 
 		for (auto& FilePath : AbsoluteFilePaths)
 		{
@@ -139,8 +142,10 @@ namespace GitSourceControlUtils
 
 				if (TestPath.IsEmpty())
 				{
-					// early out if empty directory string to prevent infinite loop
-					UE_LOG(LogSourceControl, Error, TEXT("Can't find directory path for file :%s"), *FilePath);
+					// TestPath.IsEmpty() meaning is that FilePath is not git file. So it need to removed to git command file list.
+					PackageNotIncludedInGit.Add(FilePath);
+					UE_LOG(LogSourceControl, Warning, TEXT("Package file to update has included dependent file is not git or Can't find directory path for file : %s"), *FilePath);
+
 					break;
 				}
 				
@@ -151,7 +156,7 @@ namespace GitSourceControlUtils
 					FPaths::NormalizeDirectoryName(RetNormalized);
 					FString PathToRepositoryRootNormalized = PathToRepositoryRoot;
 					FPaths::NormalizeDirectoryName(PathToRepositoryRootNormalized);
-					if (!FPaths::IsSamePath(RetNormalized, PathToRepositoryRootNormalized) && Ret != GitTestPath)
+					if (!FPaths::IsSamePath(RetNormalized, PathToRepositoryRootNormalized) && Ret != FPaths::GetPath(GitTestPath))
 					{
 						UE_LOG(LogSourceControl, Error, TEXT("Selected files belong to different submodules"));
 						return PathToRepositoryRoot;
@@ -161,10 +166,18 @@ namespace GitSourceControlUtils
 				}
 			}
 		}
+		if (!PackageNotIncludedInGit.IsEmpty())
+		{
+			for (const FString& ToRemoveFile : PackageNotIncludedInGit)
+			{
+				AbsoluteFilePaths.Remove(ToRemoveFile);
+			}
+		}
+
 		return Ret;
 	}
 
-	FString ChangeRepositoryRootIfSubmodule(const FString& AbsoluteFilePath, const FString& PathToRepositoryRoot)
+	FString ChangeRepositoryRootIfSubmodule(FString & AbsoluteFilePath, const FString& PathToRepositoryRoot)
 	{
 		TArray<FString> AbsoluteFilePaths = { AbsoluteFilePath };
 		return ChangeRepositoryRootIfSubmodule(AbsoluteFilePaths, PathToRepositoryRoot);
@@ -952,16 +965,18 @@ R  Content/Textures/T_Perlin_Noise_M.uasset -> Content/Textures/T_Perlin_Noise_M
 static FString FilenameFromGitStatus(const FString& InResult)
 {
 	int32 RenameIndex;
+	FString Result;
 	if (InResult.FindLastChar('>', RenameIndex))
 	{
 		// Extract only the second part of a rename "from -> to"
-		return InResult.RightChop(RenameIndex + 2);
+		Result = InResult.RightChop(RenameIndex + 2);
 	}
 	else
 	{
 		// Extract the relative filename from the Git status result (after the 2 letters status and 1 space)
-		return InResult.RightChop(3);
+		Result = InResult.RightChop(3);
 	}
+	return Result.TrimQuotes();
 }
 
 /** Match the relative filename of a Git status result with a provided absolute filename */
@@ -1370,20 +1385,7 @@ static void ParseFileStatusResult(const FString& InPathToGitBinary, const FStrin
 	ParseDirectoryStatusResult(InUsingLfsLocking, Results, OutStates);
 }
 
-/**
- * @brief Detects how to parse the result of a "status" command to get workspace file states
- *
- *  It is either a command for a whole directory (ie. "Content/", in case of "Submit to Revision Control" menu),
- * or for one or more files all on a same directory (by design, since we group files by directory in RunUpdateStatus())
- *
- * @param[in]	InPathToGitBinary	The path to the Git binary
- * @param[in]	InRepositoryRoot	The Git repository from where to run the command - usually the Game directory (can be empty)
- * @param[in]	InUsingLfsLocking	Tells if using the Git LFS file Locking workflow
- * @param[in]	InFiles				List of files in a directory, or the path to the directory itself (never empty).
- * @param[out]	InResults			Results from the "status" command
- * @param[out]	OutStates			States of files for witch the status has been gathered (distinct than InFiles in case of a "directory status")
- */
-static void ParseStatusResults(const FString& InPathToGitBinary, const FString& InRepositoryRoot, const bool InUsingLfsLocking, const TArray<FString>& InFiles,
+void ParseStatusResults(const FString& InPathToGitBinary, const FString& InRepositoryRoot, const bool InUsingLfsLocking, const TArray<FString>& InFiles,
 							   const TMap<FString, FString>& InResults, TMap<FString, FGitSourceControlState>& OutStates)
 {
 	TSet<FString> Files;
@@ -1631,6 +1633,16 @@ FString GetFullPathFromGitStatus(const FString& Result, const FString& InReposit
 
 bool UpdateChangelistStateByCommand()
 {
+	// TODO: This is a temporary solution.
+	FModuleManager &ModuleManager = FModuleManager::Get();
+	FName GitModuleName = "GitSourceControl";
+
+	if (!ModuleManager.IsModuleLoaded(GitModuleName))
+	{
+		UE_LOG(LogSourceControl, Warning, TEXT("GitSourceControl module is not loaded."));
+		return false;
+	}
+	
 	FGitSourceControlModule& GitSourceControl = FModuleManager::GetModuleChecked<FGitSourceControlModule>("GitSourceControl");
 	FGitSourceControlProvider& Provider = GitSourceControl.GetProvider();
 	if (!Provider.IsGitAvailable())
@@ -1828,13 +1840,20 @@ bool RunDumpToFile(const FString& InPathToGitBinary, const FString& InRepository
 			FPlatformProcess::ReadPipeToArray(PipeRead, BinaryData);
 			if (BinaryData.Num() > 0)
 			{
-				// @todo: this is hacky!
-				if (BinaryData[0] == 68) // Check for D in "Downloading"
+				if (GitSourceControl.AccessSettings().IsUsingGitLfsLocking())
 				{
-					if (BinaryData[BinaryData.Num() - 1] == 10) // Check for newline
+					// @todo: this is hacky!
+					if (BinaryData[0] == 68) // Check for D in "Downloading"
 					{
-						BinaryData.Reset();
-						bRemovedLFSMessage = true;
+						if (BinaryData[BinaryData.Num() - 1] == 10) // Check for newline
+						{
+							BinaryData.Reset();
+							bRemovedLFSMessage = true;
+						}
+					}
+					else
+					{
+						BinaryFileContent.Append(MoveTemp(BinaryData));
 					}
 				}
 				else
@@ -1847,21 +1866,28 @@ bool RunDumpToFile(const FString& InPathToGitBinary, const FString& InRepository
 		FPlatformProcess::ReadPipeToArray(PipeRead, BinaryData);
 		if (BinaryData.Num() > 0)
 		{
-			// @todo: this is hacky!
-			if (!bRemovedLFSMessage && BinaryData[0] == 68) // Check for D in "Downloading"
+			if (GitSourceControl.AccessSettings().IsUsingGitLfsLocking())
 			{
-				int32 NewLineIndex = 0;
-				for (int32 Index = 0; Index < BinaryData.Num(); Index++)
+				// @todo: this is hacky!
+				if (!bRemovedLFSMessage && BinaryData[0] == 68) // Check for D in "Downloading"
 				{
-					if (BinaryData[Index] == 10) // Check for newline
+					int32 NewLineIndex = 0;
+					for (int32 Index = 0; Index < BinaryData.Num(); Index++)
 					{
-						NewLineIndex = Index;
-						break;
+						if (BinaryData[Index] == 10) // Check for newline
+						{
+							NewLineIndex = Index;
+							break;
+						}
+					}
+					if (NewLineIndex > 0)
+					{
+						BinaryData.RemoveAt(0, NewLineIndex + 1);
 					}
 				}
-				if (NewLineIndex > 0)
+				else
 				{
-					BinaryData.RemoveAt(0, NewLineIndex + 1);
+					BinaryFileContent.Append(MoveTemp(BinaryData));
 				}
 			}
 			else
@@ -2345,7 +2371,7 @@ bool CheckLFSLockable(const FString& InPathToGitBinary, const FString& InReposit
 	for (int i = 0; i < InFiles.Num(); i++)
 	{
 		const FString& Result = Results[i];
-		if (Result.EndsWith("set"))
+		if (Result.EndsWith("set") && !Result.EndsWith("unset"))
 		{
 			const FString FileExt = InFiles[i].RightChop(1); // Remove wildcard (*)
 			LockableTypes.Add(FileExt);

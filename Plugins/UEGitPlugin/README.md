@@ -29,6 +29,8 @@ Either install this into your project's `Plugins/` folder, or if you would like 
 rename `Engine/Plugins/Developer/GitSourceControl.uplugin` to `Engine/Plugins/Developer/GitSourceControl.uplugin.disabled` 
 and then install this plugin to the `Engine/Plugins` folder.
 
+Please note that we do not provide precompiled binaries at this time, so you will need to use Visual Studio to compile the plugin.
+
 ### Note about .gitattributes and .gitignore
 
 This plugin requires explicit file attributes for `*.umap` and `*.uasset`, rather than other approaches of using wildcards for the content folder (`Content/**`).

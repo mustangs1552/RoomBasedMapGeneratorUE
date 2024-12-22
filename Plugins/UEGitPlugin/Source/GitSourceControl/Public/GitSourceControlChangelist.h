@@ -1,5 +1,6 @@
 ﻿#pragma once
 #include "ISourceControlChangelist.h"
+#include "Runtime/Launch/Resources/Version.h"
 
 class FGitSourceControlChangelist : public ISourceControlChangelist
 {

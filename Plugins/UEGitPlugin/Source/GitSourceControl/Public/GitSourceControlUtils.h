@@ -7,6 +7,7 @@
 
 #include "GitSourceControlRevision.h"
 #include "GitSourceControlState.h"
+#include "UObject/ObjectSaveContext.h"
 
 class FGitSourceControlState;
 
@@ -60,7 +61,7 @@ namespace GitSourceControlUtils
 		* @param AbsoluteFilePaths		The list of files in the SC operation
 		* @param PathToRepositoryRoot	The original path to the repository root (used by default)
 		*/
-	FString ChangeRepositoryRootIfSubmodule(const TArray<FString>& AbsoluteFilePaths, const FString& PathToRepositoryRoot);
+	FString ChangeRepositoryRootIfSubmodule(TArray<FString>& AbsoluteFilePaths, const FString& PathToRepositoryRoot);
 
 	/**
 		*  Returns an updated repo root if all selected file is in a plugin subfolder, and the plugin subfolder is a git repo
@@ -69,7 +70,7 @@ namespace GitSourceControlUtils
 		* @param AbsoluteFilePath		The file in the SC operation
 		* @param PathToRepositoryRoot	The original path to the repository root (used by default)
 		*/
-	FString ChangeRepositoryRootIfSubmodule(const FString& AbsoluteFilePath, const FString& PathToRepositoryRoot);
+	FString ChangeRepositoryRootIfSubmodule(FString & AbsoluteFilePath, const FString& PathToRepositoryRoot);
 
 /**
  * Find the path to the Git binary, looking into a few places (standalone Git install, and other common tools embedding Git)
@@ -175,7 +176,7 @@ bool GetRemoteUrl(const FString& InPathToGitBinary, const FString& InRepositoryR
  * @param	OutErrorMessages	Any errors (from StdErr) as an array per-line
  * @returns true if the command succeeded and returned no errors
  */
-bool RunCommand(const FString& InCommand, const FString& InPathToGitBinary, const FString& InRepositoryRoot, const TArray<FString>& InParameters, const TArray<FString>& InFiles, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
+GITSOURCECONTROL_API  bool RunCommand( const FString & InCommand, const FString & InPathToGitBinary, const FString & InRepositoryRoot, const TArray< FString > & InParameters, const TArray< FString > & InFiles, TArray< FString > & OutResults, TArray< FString > & OutErrorMessages );
 bool RunCommandInternalRaw(const FString& InCommand, const FString& InPathToGitBinary, const FString& InRepositoryRoot, const TArray<FString>& InParameters, const TArray<FString>& InFiles, FString& OutResults, FString& OutErrors, const int32 ExpectedReturnCode = 0);
 
 /**
@@ -204,6 +205,21 @@ bool ListFilesInDirectoryRecurse(const FString& InPathToGitBinary, const FString
  * @returns true if the command succeeded and returned no errors
  */
 bool RunCommit(const FString& InPathToGitBinary, const FString& InRepositoryRoot, const TArray<FString>& InParameters, const TArray<FString>& InFiles, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
+
+/**
+ * @brief Detects how to parse the result of a "status" command to get workspace file states
+ *
+ *  It is either a command for a whole directory (ie. "Content/", in case of "Submit to Revision Control" menu),
+ * or for one or more files all on a same directory (by design, since we group files by directory in RunUpdateStatus())
+ *
+ * @param[in]	InPathToGitBinary	The path to the Git binary
+ * @param[in]	InRepositoryRoot	The Git repository from where to run the command - usually the Game directory (can be empty)
+ * @param[in]	InUsingLfsLocking	Tells if using the Git LFS file Locking workflow
+ * @param[in]	InFiles				List of files in a directory, or the path to the directory itself (never empty).
+ * @param[out]	InResults			Results from the "status" command
+ * @param[out]	OutStates			States of files for witch the status has been gathered (distinct than InFiles in case of a "directory status")
+ */
+GITSOURCECONTROL_API void ParseStatusResults( const FString & InPathToGitBinary, const FString & InRepositoryRoot, const bool InUsingLfsLocking, const TArray< FString > & InFiles, const TMap< FString, FString > & InResults, TMap< FString, FGitSourceControlState > & OutStates );
 
 /**
  * Checks remote branches to see file differences.
@@ -316,13 +332,13 @@ void RemoveRedundantErrors(FGitSourceControlCommand& InCommand, const FString& I
  * Helper function for various commands to update cached states.
  * @returns true if any states were updated
  */
-bool UpdateCachedStates(const TMap<const FString, FGitState>& InResults);
+GITSOURCECONTROL_API bool UpdateCachedStates( const TMap< const FString, FGitState > & InResults );
 
 /**
 * Helper function for various commands to collect new states.
 * @returns true if any states were updated
 */
-bool CollectNewStates(const TMap<FString, FGitSourceControlState>& InStates, TMap<const FString, FGitState>& OutResults);
+GITSOURCECONTROL_API bool CollectNewStates( const TMap< FString, FGitSourceControlState > & InStates, TMap< const FString, FGitState > & OutResults );
 	
 /**
  * Helper function for various commands to collect new states.
@@ -356,12 +372,12 @@ bool IsFileLFSLockable(const FString& InFile);
  */
 bool CheckLFSLockable(const FString& InPathToGitBinary, const FString& InRepositoryRoot, const TArray<FString>& InFiles, TArray<FString>& OutErrorMessages);
 
-bool FetchRemote(const FString& InPathToGitBinary, const FString& InPathToRepositoryRoot, bool InUsingGitLfsLocking, TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
+GITSOURCECONTROL_API bool FetchRemote( const FString & InPathToGitBinary, const FString & InPathToRepositoryRoot, bool InUsingGitLfsLocking, TArray< FString > & OutResults, TArray< FString > & OutErrorMessages );
 
 bool PullOrigin(const FString& InPathToGitBinary, const FString& InPathToRepositoryRoot, const TArray<FString>& InFiles, TArray<FString>& OutFiles,
 				TArray<FString>& OutResults, TArray<FString>& OutErrorMessages);
 
 
-TSharedPtr< class ISourceControlRevision, ESPMode::ThreadSafe > GetOriginRevisionOnBranch( const FString & InPathToGitBinary, const FString & InRepositoryRoot, const FString & InRelativeFileName, TArray< FString > & OutErrorMessages, const FString & BranchName );
+GITSOURCECONTROL_API TSharedPtr< class ISourceControlRevision, ESPMode::ThreadSafe > GetOriginRevisionOnBranch( const FString & InPathToGitBinary, const FString & InRepositoryRoot, const FString & InRelativeFileName, TArray< FString > & OutErrorMessages, const FString & BranchName );
 
 }
