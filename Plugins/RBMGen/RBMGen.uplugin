@@ -1,0 +1,30 @@
+{
+  "FileVersion": 3,
+  "Version": 206,
+  "VersionName": "0.14.1-beta.2",
+  "FriendlyName": "RBMGen",
+  "Description": "A map generator that can spawn connecting rooms to create a map.",
+  "Category": "RBMGen",
+  "CreatedBy": "Matthew George",
+  "CreatedByURL": "",
+  "DocsURL": "",
+  "MarketplaceURL": "",
+  "SupportURL": "",
+  "CanContainContent": true,
+  "IsBetaVersion": true,
+  "IsExperimentalVersion": false,
+  "Installed": false,
+  "Modules": [
+    {
+      "Name": "RBMGen",
+      "Type": "Runtime",
+      "LoadingPhase": "PreLoadingScreen"
+    }
+  ],
+  "Plugins": [
+    {
+      "Name": "UEToolkitBPFL",
+      "Enabled": true
+    }
+  ]
+}

@@ -76,3 +76,4 @@ DerivedDataCache/*
 # Allow VersioningTool.exe
 !Plugins/AutoVersioning/VersioningTool.exe
 *.vsconfig
+Builds/
